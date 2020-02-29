@@ -10,8 +10,10 @@ import org.slf4j.LoggerFactory;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class Cache {
@@ -91,5 +93,11 @@ public class Cache {
     public long checkedProxyAmount() {
         final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
         return cache.values().stream().filter(p -> p.latency < Integer.MAX_VALUE).count();
+    }
+
+    public List<Proxy> readyProxies() {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        return cache.values().stream().filter(proxy -> proxy.latency != null && proxy.latency != Long.MAX_VALUE)
+                .collect(Collectors.toList());
     }
 }

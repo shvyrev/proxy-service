@@ -42,6 +42,11 @@ $ docker push registry.heroku.com/appmobiles-proxy-service/web
 $ heroku container:release web -a appmobiles-proxy-service
 ```
 
+Clean Docker images
+```bash
+$ docker rmi appmobiles/proxy-service registry.heroku.com/appmobiles-proxy-service/web
+```
+
 Check 
 ```bash
 $ http "https://appmobiles-proxy-service.herokuapp.com/ping"
@@ -51,6 +56,7 @@ Statistic
 ```bash
 $ http "https://appmobiles-proxy-service.herokuapp.com/stat"
 ```
+
 
 ## Packaging and running the application
 
