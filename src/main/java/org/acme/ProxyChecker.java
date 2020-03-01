@@ -1,21 +1,19 @@
 package org.acme;
 
-import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 import io.vertx.axle.core.Vertx;
 import io.vertx.axle.core.buffer.Buffer;
 import io.vertx.axle.ext.web.client.HttpResponse;
 import org.acme.model.Proxy;
+import org.acme.model.Report;
+import org.acme.model.ReportEntity;
 import org.acme.utils.Utils;
 import org.acme.workers.HTTPWorker;
 import org.eclipse.microprofile.context.ManagedExecutor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.annotation.Priority;
 import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.event.Observes;
 import javax.inject.Inject;
+import javax.transaction.Transactional;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ThreadLocalRandom;
@@ -27,10 +25,10 @@ import static org.acme.utils.Utils.nowMillis;
 @ApplicationScoped
 public class ProxyChecker {
 
-    public static final int CONNECT_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(30);
+    public static final int CONNECT_TIMEOUT = (int) TimeUnit.SECONDS.toMillis(20);
     public static final int TEST_PORT = 443;
 
-    public static final List<String > hosts = List.of("api.ipify.org", "icanhazip.com");
+    public static final List<String > hosts = List.of("ya.ru");
 
     @Inject
     Cache cache;
@@ -44,19 +42,23 @@ public class ProxyChecker {
     @Inject
     HTTPWorker http;
 
-    private static final Logger log = LoggerFactory.getLogger( ProxyChecker.class );
-
-    @Scheduled(every = "24h")
+    @Transactional
+    @Scheduled(every = "6h")
     void onTime(){
-        IntStream.range(0, 10).forEach(i -> check());
+        cache.lastReport().ifPresent(this::saveReport);
+        cache.upsert(Report.create());
+        IntStream.range(0, Runtime.getRuntime().availableProcessors() >> 2).forEach(i -> check());
     }
 
-//    void onStart(@Observes @Priority(1)StartupEvent event){
-//        IntStream.range(0, 10).forEach(i -> check());
-//    }
+    private void saveReport(Report report) {
+        ReportEntity.of(
+                report.finish(cache.checkedProxyAmount(), cache.availableProxyAmount(),
+                        cache.unavailableProxyAmount(), cache.size(Proxy.class))
+        ).persist();
+    }
 
     private void check() {
-        cache.randomProxy().ifPresentOrElse(this::check, () -> runLater(this::check));
+        cache.firstNotCheckedProxy().ifPresentOrElse(this::check, () -> runLater(this::check));
     }
 
     private void check(Proxy proxy) {
@@ -64,11 +66,8 @@ public class ProxyChecker {
         request(proxy)
                 .exceptionally(Utils::throwableHandler)
                 .thenAccept(response -> {
-                    if (response != null && response.statusCode() == 200) {
-                        proxy.updatedAt = nowMillis();
-                        proxy.latency = proxy.updatedAt - startTime;
-                        cache.upsert(proxy);
-                    }
+                    proxy.latency = response != null && response.statusCode() == 200 ? nowMillis() - startTime : Long.MAX_VALUE;
+                    cache.upsert(proxy);
                     runLater(this::check);
                 });
     }

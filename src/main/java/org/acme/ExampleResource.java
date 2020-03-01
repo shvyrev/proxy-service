@@ -1,7 +1,7 @@
 package org.acme;
 
-import io.vertx.core.json.JsonObject;
 import org.acme.model.Proxy;
+import org.acme.model.Report;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -9,6 +9,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.Optional;
 
 import static javax.ws.rs.core.Response.ok;
 
@@ -26,22 +27,18 @@ public class ExampleResource {
     }
 
     @GET
+    @Path("report")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Optional<Report> report(){
+        return cache.lastReport().map(report -> report.finish(cache.checkedProxyAmount(), cache.availableProxyAmount(),
+                cache.unavailableProxyAmount(), cache.size(Proxy.class)));
+    }
+
+    @GET
     @Path("proxy")
     @Produces(MediaType.APPLICATION_JSON)
     public Response proxy(){
         return ok(cache.randomMinLatencyProxy()).build();
-    }
-
-    @GET
-    @Path("stat")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response stat(){
-        return ok(
-                new JsonObject()
-                        .put("proxies", cache.size(Proxy.class))
-                        .put("cpu", Runtime.getRuntime().availableProcessors())
-                        .put("proxiesChecked", cache.checkedProxyAmount())
-        ).build();
     }
 
     @GET

@@ -10,4 +10,11 @@ public class ContentTask extends TaskImpl {
         return new ContentTask(type, url);
     }
 
+    @Override
+    public String toString() {
+        return "ContentTask{" +
+                "type='" + type + '\'' +
+                ", url='" + url + '\'' +
+                '}';
+    }
 }

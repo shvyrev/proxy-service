@@ -1,8 +1,10 @@
 package org.acme;
 
 import org.acme.model.Proxy;
+import org.acme.model.Report;
 import org.acme.utils.IdImpl;
 import org.acme.utils.JsonImpl;
+import org.infinispan.CacheStream;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,10 +72,6 @@ public class Cache {
         }
     }
 
-    public Optional<Proxy> randomProxy(){
-        return randomProxy(Comparator.comparingLong(Proxy::lastUpdateTime).reversed());
-    }
-
     public Optional<Proxy> randomMinLatencyProxy() {
         return randomProxy(Comparator.comparingLong(Proxy::latency));
     }
@@ -84,20 +82,43 @@ public class Cache {
         if (cache.isEmpty()) {
             return Optional.empty();
         } else {
-            final long size = Math.min(20, size(aClass));
+            final long size = size(aClass);
             final long count = ThreadLocalRandom.current().nextLong(0, size);
             return cache.values().stream().sorted(comparator).skip(count).limit(1).findFirst();
         }
     }
 
-    public long checkedProxyAmount() {
+    public long availableProxyAmount() {
         final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
-        return cache.values().stream().filter(p -> p.latency < Integer.MAX_VALUE).count();
+        return availableProxyStream(cache).count();
     }
 
-    public List<Proxy> readyProxies() {
+    public List<Proxy> availableProxies() {
         final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
-        return cache.values().stream().filter(proxy -> proxy.latency != null && proxy.latency != Long.MAX_VALUE)
-                .collect(Collectors.toList());
+        return availableProxyStream(cache).collect(Collectors.toList());
+    }
+
+    public long checkedProxyAmount() {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        return cache.values().stream().filter(proxy -> proxy.latency != null).count();
+    }
+
+    private CacheStream<Proxy> availableProxyStream(org.infinispan.Cache<String, Proxy> cache) {
+        return cache.values().stream().filter(p -> p.latency != null && p.latency < Long.MAX_VALUE);
+    }
+
+    public long unavailableProxyAmount() {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        return cache.values().stream().filter(proxy -> proxy.latency != null && proxy.latency == Long.MAX_VALUE).count();
+    }
+
+    public Optional<Report> lastReport() {
+        final org.infinispan.Cache<String, Report> cache = getCache(Report.class);
+        return cache.values().stream().max(Comparator.comparingLong(report -> report.startedAt));
+    }
+
+    public Optional<Proxy> firstNotCheckedProxy() {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        return cache.values().stream().filter(proxy -> proxy.latency == null).limit(1).findFirst();
     }
 }

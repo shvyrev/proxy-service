@@ -18,7 +18,7 @@ public class Backup {
     @Transactional
     @Scheduled(every = "20m")
     void save(){
-        cache.readyProxies().forEach(proxy -> {
+        cache.availableProxies().forEach(proxy -> {
             if (ProxyEntity.findById(proxy.id()) == null) {
                 ProxyEntity.of(proxy).persist();
             }
