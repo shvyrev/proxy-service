@@ -19,7 +19,7 @@ xmlns:ispn="urn:infinispan:config:10.0">
     <transport cluster="test" stack="tcpping"/>
     <distributed-cache name="dist">
         <memory>
-            <object size="21000"/>
+            <object size="150000"/>
         </memory>
     </distributed-cache>
 </cache-container>

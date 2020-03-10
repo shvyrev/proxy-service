@@ -10,6 +10,8 @@ import org.acme.model.ReportEntity;
 import org.acme.utils.Utils;
 import org.acme.workers.HTTPWorker;
 import org.eclipse.microprofile.context.ManagedExecutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
@@ -42,12 +44,20 @@ public class ProxyChecker {
     @Inject
     HTTPWorker http;
 
+    @Inject
+    AppType appType;
+
+    private static final Logger log = LoggerFactory.getLogger( ProxyChecker.class );
+
     @Transactional
     @Scheduled(every = "6h")
     void onTime(){
-        cache.lastReport().ifPresent(this::saveReport);
-        cache.upsert(Report.create());
-        IntStream.range(0, Runtime.getRuntime().availableProcessors() >> 2).forEach(i -> check());
+        if (appType.isChecker()) {
+            log.info(" $ HER BLYAD : " + "");
+            cache.lastReport().ifPresent(this::saveReport);
+            cache.upsert(Report.create());
+            IntStream.range(0, Runtime.getRuntime().availableProcessors() >> 2).forEach(i -> check());
+        }
     }
 
     private void saveReport(Report report) {
@@ -58,7 +68,7 @@ public class ProxyChecker {
     }
 
     private void check() {
-        cache.firstNotCheckedProxy().ifPresentOrElse(this::check, () -> runLater(this::check));
+        cache.firstNotLatencyProxy().ifPresentOrElse(this::check, () -> runLater(this::check));
     }
 
     private void check(Proxy proxy) {

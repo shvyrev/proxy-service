@@ -8,16 +8,12 @@ import org.acme.tasks.LinkTask;
 import org.acme.tasks.TaskImpl;
 import org.acme.utils.IdImpl;
 import org.acme.workers.HTTPWorker;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
 public abstract class ManagerImpl {
-
-    private static final Logger log = LoggerFactory.getLogger( ManagerImpl.class );
 
     <U> CompletionStage<U> save(List<? extends IdImpl> list) {
         return getVertx().executeBlocking(event -> {

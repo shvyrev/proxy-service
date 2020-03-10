@@ -7,6 +7,7 @@ import io.vertx.axle.ext.web.client.WebClient;
 import io.vertx.axle.ext.web.codec.BodyCodec;
 import io.vertx.core.file.OpenOptions;
 import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.ProxyOptions;
 import io.vertx.core.net.ProxyType;
 import io.vertx.ext.web.client.WebClientOptions;
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
+import static java.lang.String.format;
 import static org.acme.Constants.*;
 import static org.acme.ProxyChecker.CONNECT_TIMEOUT;
 import static org.acme.utils.Utils.rndUUID;
@@ -61,6 +63,16 @@ public class HTTPWorker {
         return getHtml(url).thenCompose(s -> CompletableFuture.completedFuture(Jsoup.parse(s)));
     }
 
+    public CompletionStage<JsonObject> geo(String ip){
+        final WebClient client = getClient();
+        return client.getAbs(format("https://freegeoip.app/json/%s", ip)).send()
+                .exceptionally(Utils::throwableHandler)
+                .thenApply(response -> {
+                    client.close();
+                    return response != null && response.statusCode() == 200 ? response.bodyAsJsonObject() : new JsonObject();
+                });
+    }
+
     public CompletionStage<String> download(String url){
         final WebClient client = getClient();
         final FileSystem fileSystem = vertx.fileSystem();
@@ -68,7 +80,10 @@ public class HTTPWorker {
                 .thenCompose(s -> {
                     final AsyncFile asyncFile = fileSystem.openBlocking(s, new OpenOptions().setSync(true));
                     return client.getAbs(url).as(BodyCodec.pipe(asyncFile)).send()
-                            .thenCompose(voidHttpResponse -> CompletableFuture.completedFuture(s));
+                            .thenCompose(voidHttpResponse -> {
+                                client.close();
+                                return CompletableFuture.completedFuture(s);
+                            });
                 });
     }
 

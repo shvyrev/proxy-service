@@ -2,8 +2,8 @@ package org.acme.managers;
 
 import io.quarkus.scheduler.Scheduled;
 import io.vertx.axle.core.Vertx;
+import io.vertx.axle.core.eventbus.EventBus;
 import org.acme.Cache;
-import org.acme.model.Proxy;
 import org.acme.tasks.ContentTask;
 import org.acme.tasks.LinkTask;
 import org.acme.utils.Utils;
@@ -11,11 +11,11 @@ import org.acme.workers.ContentWorker;
 import org.acme.workers.HTTPWorker;
 import org.acme.workers.LinkWorker;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.context.ManagedExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
-
 import java.util.stream.IntStream;
 
 import static java.lang.String.format;
@@ -44,10 +44,16 @@ public class OpenProxyManager extends ManagerImpl{
     @Inject
     ContentWorker contentWorker;
 
-    private int itemPerPage = 18;
-    private int depth = 3;
+    @Inject
+    ManagedExecutor managedExecutor;
 
-    @Scheduled(every = "6h")
+    private int itemPerPage = 18;
+    private int depth = 2;
+
+    @Inject
+    EventBus eventBus;
+
+    @Scheduled(every = "20m")
     void onTime(){
         config(TYPE, configUrl, http)
                 .thenApply(s ->
@@ -62,8 +68,9 @@ public class OpenProxyManager extends ManagerImpl{
     private void next() {
         task(TYPE)
                 .map(task -> task instanceof LinkTask ? linkWorker.openProxy((LinkTask) task) : contentWorker.openProxy((ContentTask) task))
-                .ifPresent(compStage -> compStage.thenCompose(this::save)
-                        .exceptionally(Utils::throwableHandler).thenAccept(s -> next()));
+                .ifPresentOrElse(compStage -> compStage.thenCompose(this::save)
+                        .exceptionally(Utils::throwableHandler).thenAccept(s -> runLater(this::next)),
+                        () -> eventBus.publish("proxy-ready", null));
     }
 
     @Override
@@ -75,4 +82,9 @@ public class OpenProxyManager extends ManagerImpl{
     Cache getCache() {
         return cache;
     }
+
+    private void runLater(Runnable runnable) {
+        vertx.timerStream(250).handler(l -> managedExecutor.execute(runnable));
+    }
+
 }

@@ -42,6 +42,7 @@ public class ExampleResource {
     }
 
     @GET
+    @Path("hello")
     @Produces(MediaType.TEXT_PLAIN)
     public String hello() {
         return "hello";

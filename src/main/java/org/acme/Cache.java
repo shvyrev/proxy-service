@@ -1,6 +1,7 @@
 package org.acme;
 
 import org.acme.model.Proxy;
+import org.acme.model.ProxyType;
 import org.acme.model.Report;
 import org.acme.utils.IdImpl;
 import org.acme.utils.JsonImpl;
@@ -29,8 +30,8 @@ public class Cache {
         return getCache(value).putIfAbsent(value.id(), value);
     }
 
-    public <V extends IdImpl> void upsert(V value) {
-        getCache(value).put(value.id(), value);
+    public <V extends IdImpl> V upsert(V value) {
+        return getCache(value).put(value.id(), value);
     }
 
     public <V extends JsonImpl> long size(String field, String value, Class<V> tClass) {
@@ -41,6 +42,16 @@ public class Cache {
 
     public int size(Class tClass) {
         return getCache(tClass).size();
+    }
+
+    public CacheStream<Proxy> streamProxyByType(ProxyType type) {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        return cache.values().stream().filter(proxy -> proxy.type == type);
+    }
+
+    public CacheStream<Proxy> streamProxy() {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        return cache.values().stream();
     }
 
     private <V extends IdImpl> org.infinispan.Cache<String, V> getCache(V value) {
@@ -117,8 +128,23 @@ public class Cache {
         return cache.values().stream().max(Comparator.comparingLong(report -> report.startedAt));
     }
 
-    public Optional<Proxy> firstNotCheckedProxy() {
+    public Optional<Proxy> firstNotLatencyProxy() {
         final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
         return cache.values().stream().filter(proxy -> proxy.latency == null).limit(1).findFirst();
     }
+
+    public Optional<Proxy> rndNoGeoProxy() {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        if (cache.isEmpty()) {
+            return Optional.empty();
+        }
+        final long l = ThreadLocalRandom.current().nextLong(0, geoProxyAmount());
+        return cache.values().stream().filter(proxy -> proxy.country == null || proxy.country.isEmpty()).skip(l).limit(1).findAny();
+    }
+
+    public long geoProxyAmount() {
+        final org.infinispan.Cache<String, Proxy> cache = getCache(Proxy.class);
+        return cache.values().stream().filter(proxy -> proxy.country != null && !proxy.country.isEmpty()).count();
+    }
+
 }

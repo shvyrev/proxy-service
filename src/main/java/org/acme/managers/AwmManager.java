@@ -37,10 +37,10 @@ public class AwmManager extends ManagerImpl {
 
     @Scheduled(every = "1m")
     void onTime(){
-        config(TYPE, configUrl, http)
-                .thenApply(s -> cache.addIfNotExist(ContentTask.of(TYPE, s)))
-                .exceptionally(Utils::throwableHandler)
-                .thenAccept(aVoid -> next());
+//        config(TYPE, configUrl, http)
+//                .thenApply(s -> cache.addIfNotExist(ContentTask.of(TYPE, s)))
+//                .exceptionally(Utils::throwableHandler)
+//                .thenAccept(aVoid -> next());
     }
 
     private void next() {
