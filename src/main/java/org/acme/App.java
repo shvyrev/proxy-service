@@ -13,6 +13,10 @@ import javax.enterprise.event.Observes;
 import javax.inject.Inject;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.concurrent.CompletionStage;
+
+import static org.acme.ProxyParser.RESULT_FILE_PATTERN;
+import static org.acme.ProxyParser.TMP_FILE_PATTERN;
 
 @ApplicationScoped
 public class App {
@@ -27,5 +31,10 @@ public class App {
     void onStart(@Observes @Priority(1)StartupEvent event){
         log.info(" $ onStart : " + event);
 
+//        cleanUpFolders()
+//                .exceptionally(Utils::throwableHandler)
+//                .thenAccept(aVoid -> log.info(" $ onStart : " + "cleaned"));
+
     }
+
 }

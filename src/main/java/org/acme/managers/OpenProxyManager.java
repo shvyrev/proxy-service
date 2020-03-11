@@ -12,8 +12,6 @@ import org.acme.workers.HTTPWorker;
 import org.acme.workers.LinkWorker;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.context.ManagedExecutor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.util.stream.IntStream;
@@ -48,7 +46,7 @@ public class OpenProxyManager extends ManagerImpl{
     ManagedExecutor managedExecutor;
 
     private int itemPerPage = 18;
-    private int depth = 2;
+    private int depth = 4;
 
     @Inject
     EventBus eventBus;

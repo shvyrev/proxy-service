@@ -20,10 +20,8 @@ import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -68,40 +66,56 @@ public class ProxyParser {
     @Inject
     Zip zip;
 
-    private static final String TMP_FILE_PATTERN = "tmp/%s.%s";
-    private static final String RESULT_FILE_PATTERN = "results/%s.%s";
-    public static final String FILES_PATTERN = "../files/%s.%s";
+    public static final String TMP_FILE_PATTERN = "tmp/%s.%s";
+    public static final String RESULT_FILE_PATTERN = "results/%s.%s";
 
     private DatabaseReader geoReader;
 
     @ConsumeEvent(value = "proxy-ready")
     public void onProxyReady(String value){
-        enrichData()
+        log.info(" $ onProxyReady : " + cache.size(Proxy.class));
+
+        cleanUpFolders()
+                .thenCompose(aVoid -> enrichData())
                 .thenCompose(this::txtFiles)
                 .thenCompose(this::saveCsv)
                 .thenCompose(this::saveJson)
                 .thenCompose(this::zip)
-                .thenCompose(this::upload)
                 .thenApply(this::report)
+                .thenCompose(this::upload)
                 .exceptionally(Utils::throwableHandler)
                 .thenAccept(jsonObject -> log.info(" $ onProxyReady : " + jsonObject));
+    }
+
+    private CompletionStage<Void> cleanUpFolders() {
+        return file.tryClean(Paths.get(TMP_FILE_PATTERN).getParent())
+                .thenCompose(aVoid -> file.tryClean(Paths.get(RESULT_FILE_PATTERN).getParent()));
     }
 
     private CompletionStage<Void> upload(Void aVoid) {
         return azureS3Manager.uploadFiles(Paths.get(RESULT_FILE_PATTERN).getParent());
     }
 
-    private JsonObject report(Void aVoid) {
+    private Void report(Void aVoid) {
         final List<JsonObject> byCountry = cache.streamProxy().map(proxy -> proxy.country).distinct()
                 .map(s -> new JsonObject().put("country", s).put("size", cache.size("country", s, Proxy.class)))
                 .collect(Collectors.toList());
 
-        return new JsonObject()
+        final JsonObject jsonObject = new JsonObject()
                 .put("amount", cache.size(Proxy.class))
                 .put(Https.getValue(), cache.size("type", Https.getValue(), Proxy.class))
                 .put(Socks4.getValue(), cache.size("type", Socks4.getValue(), Proxy.class))
                 .put(Socks5.getValue(), cache.size("type", Socks5.getValue(), Proxy.class))
                 .put("byCountry", new JsonArray(byCountry));
+        try {
+            Files.write(
+                    Paths.get(RESULT_FILE_PATTERN).getParent().resolve("report.json")
+                    , jsonObject.encode().getBytes(StandardCharsets.UTF_8)
+                    , StandardOpenOption.CREATE
+            );
+        } catch (Exception ie) {}
+
+        return null;
     }
 
     private CompletionStage<Void> zip(Void v) {

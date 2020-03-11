@@ -62,8 +62,6 @@ public class AzureS3Service {
         return store().thenCompose(store -> vertx.executeBlocking(list(dirName, store)));
     }
 
-    private static final Logger log = LoggerFactory.getLogger( AzureS3Service.class );
-
     public CompletionStage<Void> upload(Path filePath){
         return store().thenCompose(store -> vertx.executeBlocking(upload(filePath, null, store)));
     }
